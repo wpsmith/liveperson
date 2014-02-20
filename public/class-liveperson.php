@@ -12,7 +12,7 @@
 /**
  * Public LivePerson Class
  *
- * @package Plugin_Name
+ * @package LivePerson
  * @author  Travis Smith <t@wpsmith.net>
  */
 class LivePerson {
@@ -58,6 +58,15 @@ class LivePerson {
 	public static $site = null;
 	
 	/**
+	 * Base LivePerson Script.
+	 *
+	 * @since    1.0.0
+	 *
+	 * @var      string
+	 */
+	public static $base = 'https://server.iad.liveperson.net/hc';
+	
+	/**
 	 * Div ID.
 	 *
 	 * @since    1.0.0
@@ -80,15 +89,14 @@ class LivePerson {
 		// Activate plugin when new blog is added
 		add_action( 'wpmu_new_blog', array( $this, 'activate_new_site' ) );
 
-		// Load public-facing style sheet and JavaScript.
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
-
-		/* Define custom functionality.
-		 * Refer To http://codex.wordpress.org/Plugin_API#Hooks.2C_Actions_and_Filters
-		 */
-		add_action( 'init', array( $this, 'register_script' ) );
-		add_filter( 'wp_enqueue_scripts', array( $this, 'enqueue_script' ) );
-		add_filter( 'wp_print_footer_scripts', array( $this, 'init_script' ) );
+		// Register & Load public-facing style sheet and JavaScript.
+		if ( !is_admin() ) {
+			add_action( 'init', array( $this, 'register_script' ) );
+			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+			add_filter( 'wp_print_footer_scripts', array( $this, 'init_script' ) );
+		}
+		
+		add_shortcode( 'liveperson', array( $this, 'get_button' ) );
 
 	}
 
@@ -276,8 +284,8 @@ class LivePerson {
 	 * @since    1.0.0
 	 */
 	public function register_scripts() {
-		$script = sprintf( 'https://server.iad.liveperson.net/hc/42559493/?cmd=mTagRepstate&site=42559493&buttonID=7&divID=lpButDivID-1369143923&bt=3&c=1', $this->
-		wp_register_script( $this->plugin_slug . '-plugin-script', $script, null, self::VERSION );
+		$script = apply_filters( $this->plugin_slug . '_script', $this->get_script() );
+		wp_register_script( $this->plugin_slug . '-plugin-script', $script, null, self::VERSION ) );
 	}
 	
 	/**
@@ -286,33 +294,42 @@ class LivePerson {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
-		wp_enqueue_script( $this->plugin_slug . '-plugin-script', "https://server.iad.liveperson.net/hc/42559493/?cmd=mTagRepstate&site=42559493&buttonID=7&divID=lpButDivID-1369143923&bt=3&c=1", null, self::VERSION );
+		wp_enqueue_script( $this->plugin_slug . '-plugin-script' );
 	}
 
+	public function get_script( $args ) {
+		$defaults = array(
+			'cmd'    => 'mTagRepstate',
+			'site'   => self::$site,
+			'divID'  => self::$divID,
+			'bt'     => 1,
+			'c'      => 1,
+		);
+		
+		$args = wp_parse_args( $args, $defaults );s
+		$base = apply_filters( $this->plugin_slug . '_base', $this->base );
+		
+		return sprintf( '%s/%s/?%s', $base, $args['site'], http_build_query( $args ) );
+	}
+	
 	/**
-	 * NOTE:  Actions are points in the execution of a page or process
-	 *        lifecycle that WordPress fires.
+	 * Sets site value.
 	 *
-	 *        Actions:    http://codex.wordpress.org/Plugin_API#Actions
-	 *        Reference:  http://codex.wordpress.org/Plugin_API/Action_Reference
-	 *
-	 * @since    1.0.0
+	 * @since     1.0.0
+	 * @param	  array 	  Array of shortcode attributes.
 	 */
-	public function action_method_name() {
-		// @TODO: Define your action hook callback here
-	}
+	public function get_button( $atts ) {
+		$defaults = array(
+			'cmd' => 'mTagRepstate',
+			'site' => self::get_site(),
+			'divID' => self::get_divID(),
+			'bt' => 1,
+			'c' => 1,
+		);
 
-	/**
-	 * NOTE:  Filters are points of execution in which WordPress modifies data
-	 *        before saving it or sending it to the browser.
-	 *
-	 *        Filters: http://codex.wordpress.org/Plugin_API#Filters
-	 *        Reference:  http://codex.wordpress.org/Plugin_API/Filter_Reference
-	 *
-	 * @since    1.0.0
-	 */
-	public function filter_method_name() {
-		// @TODO: Define your filter hook callback here
+		return sprintf( '<!-- BEGIN LivePerson Button Code --><div id="%s"></div><!-- END LivePerson Button code -->', self::get( 'divID' ) );
+		
 	}
-
+	
+	
 }
